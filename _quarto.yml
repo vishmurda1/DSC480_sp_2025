@@ -1,0 +1,20 @@
+#project:
+#  type: website
+
+
+    
+format:
+  html:
+    linkcolor: "#7db7d2"
+    #linkcolor: "#866fa3" # Glossy Grape
+    toc: true
+    code-copy: true
+    code-overflow: wrap
+    #mainfont: "Atkinson Hyperlegible"
+    highlight-style: a11y-dark
+    code-link: true
+
+execute:
+  freeze: auto
+
+editor: visual

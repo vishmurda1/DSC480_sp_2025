@@ -1,0 +1,325 @@
+---
+title: "2024-11_Data check"
+#author: 
+#date: 2024/06/23
+format: 
+  html:
+    fig.height: 2
+    fig.width: 7
+    fig-format: png
+    fig-dpi: 300
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r knitr, warning=FALSE, echo = FALSE, include=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(
+  cache = FALSE,
+  echo = FALSE,
+  message = FALSE, 
+  warning = FALSE,
+  fig.show = TRUE,
+  hiline = TRUE,
+  require("knitr")
+)
+
+```
+
+```{r, echo=FALSE, warning=FALSE, include=FALSE}
+library(survival)
+library(tidyverse)
+library(tidymodels)
+#library(ggsurvfit)
+library(lubridate)
+#library(ggfortify)
+library(lmtest)
+
+library(car)
+library(poissonreg)
+
+library(pscl)
+
+library(broom)
+library(broom.mixed)
+
+library(readr)
+library(skimr)
+```
+
+
+#### Check Erik and Brenton google sheet
+
+```{r}
+#| label: read-in
+
+source("read_clean.R")
+```
+
+
+#### Check dates 
+
+```{r}
+ sum(report_full$ibis_coverage_start_date < report_full$coverage_start_date)
+```
+
+
+```{r}
+sum(ymd(report_full$event_end_date) == "1969-12-31")
+sum(ymd(report_full$ibis_coverage_start_date) == "1969-12-31")
+sum(ymd(report_full$ibis_coverage_end_date) == "1969-12-31")
+sum(ymd(report_full$last_reminder_complete_date) == "1969-12-31")
+
+```
+
+
+This is just to select only the columns we want.
+
+```{r}
+idx_0 <- which(names(report_full) == "condition_count") 
+ idx_1 <- which(names(report_full) == "urologic_cancer") 
+     
+ patients <- report_full %>% select(pid, age, org_name, hcc, status, c(idx_0:idx_1)) 
+ ## %>% distinct(pid, .keep_all = TRUE) 
+ 
+```
+ 
+ 
+```{r}
+patients %>% filter(str_detect(org_name, "Unicare - Study"))  %>% nrow()
+  #  filter(org_name == "Unicare - Study") %>% nrow()
+
+
+report_full %>% filter(!is.na(first_reminder_complete_date))
+
+```
+
+
+ 
+```{r}
+report_full %>% select(pid, org_name, status, contains("covered_days"), consent_date) %>% distinct() %>% 
+    summarize(zdays_pre = sum(covered_days_pre_ibis == 0),
+              zdays_post = sum(covered_days_post_ibis == 0),
+              nadays = sum(is.na(covered_days_post_ibis)),
+              nocons = sum(is.na(consent_date)))
+             
+```
+ 
+ 
+```{r}
+report_full %>% filter(!is.na(first_reminder_complete_date)) %>% 
+    group_by(org_name) %>% summarize(n = n()) 
+
+```
+ 
+```{r}
+unique(events_full$event_type) 
+
+events_full %>% select(pid) %>% distinct()
+```
+ 
+ 
+ #### admits pre/post
+
+```{r}
+
+#######
+####### 
+
+## pre ibis admissions count
+pre_ibis_admissions_count <- events_full %>% filter(event_start_date  <= ibis_coverage_start_date) %>% filter(event_start_date >= coverage_start_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(admit_count = n()) %>% 
+    right_join(patients, by = "pid") %>% mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))
+
+
+## post ibis admissions count
+post_ibis_admissions_count <- events_full %>% filter(event_start_date > ibis_coverage_start_date) %>% filter(event_start_date <= ibis_coverage_end_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(admit_count = n()) %>% 
+    right_join(patients, by = "pid") %>% mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))
+
+```
+
+#### admissions count totals Just Unicare admits pre/post
+
+
+```{r}
+pre_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% 
+    summarize(unicare_pre_admits  = sum(admit_count))
+
+post_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>%
+    summarize(unicare_post_admits = sum(admit_count))
+
+```
+
+
+#### admissions count totals- All member
+
+```{r}
+pre_ibis_admissions_count %>% summarize(total_admits = sum(admit_count))
+
+post_ibis_admissions_count %>% summarize(total_admits = sum(admit_count))
+```
+
+pre/post Erik counts
+
+```{r}
+events_full  %>% 
+    summarize(sum(pre_ibis_inpatient), sum(post_ibis_inpatient))
+
+events_full %>%  filter(org_name == "Unicare - Study") %>%
+    summarize(sum(pre_ibis_inpatient), sum(post_ibis_inpatient))
+
+```
+
+...but when I filter dates...
+```{r}
+events_full %>% filter(event_start_date  < ibis_coverage_start_date) %>% filter(event_start_date > coverage_start_date) %>%
+    summarize(sum(pre_ibis_inpatient), sum(post_ibis_inpatient))
+
+events_full %>% filter(event_start_date  >= ibis_coverage_start_date) %>% filter(event_start_date < ibis_coverage_end_date) %>% 
+    summarize(sum(pre_ibis_inpatient), sum(post_ibis_inpatient))
+
+
+```
+
+He is counting post dates differently
+
+#### 
+
+#### Check counts 
+
+Patient pid 10392 9 pre and 2 post, which my counts agree with:
+
+check also pid 13553. also agrees
+
+```{r}
+events_full %>% filter(pid == 10392) %>% select(event_type, event_start_date,
+                     coverage_start_date, ibis_coverage_start_date, 
+                   ibis_coverage_end_date,
+                   pre_ibis_inpatient, post_ibis_inpatient) %>% filter(event_type == "inpatient")
+```
+
+```{r}
+events_full %>% filter(event_start_date  <= ibis_coverage_start_date) %>% filter(event_start_date > coverage_start_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(admit_count = n()) %>% filter(pid == 10392)
+
+events_full %>% filter(event_start_date  > ibis_coverage_start_date) %>% filter(event_start_date < coverage_end_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(admit_count = n()) %>% filter(pid == 10392)
+
+```
+
+It must be I am filtering patients out
+
+```{r}
+events_full %>% filter(pre_ibis_inpatient == 1) %>% group_by(pid) %>% summarize(count = n()) %>% summarize(sum(count))
+events_full %>% filter(post_ibis_inpatient == 1) %>% group_by(pid) %>% summarize(count = n()) %>% summarize(sum(count))
+
+```
+
+
+####. Inpatient days pre/post
+
+```{r}
+
+#######
+####### 
+
+## pre ibis days
+pre_ibis_inpatient_days <- events_full %>% filter(event_start_date  <= ibis_coverage_start_date) %>% filter(event_start_date >= coverage_start_date) %>%
+    select(pid, event_type, event_start_date, event_end_date) %>%
+    filter(event_type == "inpatient") %>% mutate(inpatient_days = event_end_date - event_start_date) %>%
+    group_by(pid) %>% summarize(total_inpatient_days = sum(inpatient_days)) %>% 
+    right_join(patients, by = "pid") %>% mutate(total_inpatient_days = ifelse(is.na(total_inpatient_days), 0, total_inpatient_days))
+
+
+## post ibis days
+post_ibis_inpatient_days <-events_full %>% filter(event_start_date  > ibis_coverage_start_date) %>% filter(event_start_date <= ibis_coverage_end_date) %>%
+    select(pid, event_type, event_start_date, event_end_date) %>%
+    filter(event_type == "inpatient") %>% mutate(inpatient_days = event_end_date - event_start_date) %>%
+    group_by(pid) %>% summarize(total_inpatient_days = sum(inpatient_days)) %>% 
+    right_join(patients, by = "pid") %>% mutate(total_inpatient_days = ifelse(is.na(total_inpatient_days), 0, total_inpatient_days))
+
+
+```
+
+#### Inatient days pre/post  Unicare and All member
+```{r}
+
+pre_ibis_inpatient_days %>% filter(org_name == "Unicare - Study") %>% summarize(total_days = sum(total_inpatient_days))
+post_ibis_inpatient_days %>% filter(org_name == "Unicare - Study") %>% summarize(total_days = sum(total_inpatient_days))
+
+pre_ibis_inpatient_days %>% summarize(total_days = sum(total_inpatient_days))
+post_ibis_inpatient_days %>% summarize(total_days = sum(total_inpatient_days))
+
+```
+
+#### Check negative days
+
+```{r}
+report_full %>% filter(ibis_coverage_start_date < coverage_start_date) %>% nrow()
+
+report_full %>% filter(ibis_coverage_start_date < coverage_start_date) %>% 
+    select(coverage_start_date, ibis_coverage_start_date, ibis_coverage_end_date) %>% skim()
+
+```
+
+#### Coverage days pre/post Unicare and All member. 
+
+We `filter(ibis_coverage_start_date < coverage_start_date)`
+
+```{r}
+report_full %>% filter(ibis_coverage_start_date >= coverage_start_date) %>%
+    mutate(pre_ibis_covered_days_check = ibis_coverage_start_date - coverage_start_date) %>% mutate(post_ibis_covered_days_check = ibis_coverage_end_date - ibis_coverage_start_date) %>% 
+    select(pid, org_name, pre_ibis_covered_days_check, post_ibis_covered_days_check) %>% 
+    filter(org_name == "Unicare - Study") %>% 
+    summarize(unicare_pre_total = sum(pre_ibis_covered_days_check),
+              unicare_post_total = sum(post_ibis_covered_days_check))
+
+report_full %>% filter(ibis_coverage_start_date >= coverage_start_date) %>% 
+    mutate(pre_ibis_covered_days_check = ibis_coverage_start_date - coverage_start_date) %>% mutate(post_ibis_covered_days_check = ibis_coverage_end_date - ibis_coverage_start_date) %>% 
+    select(pid, org_name, pre_ibis_covered_days_check, post_ibis_covered_days_check) %>% 
+    summarize(all_member_pre_total = sum(pre_ibis_covered_days_check), 
+              all_member_post_total = sum(post_ibis_covered_days_check))
+   
+```
+
+
+
+
+Check the various columns in `events_full`
+
+```{r}
+df_check <- events_full %>% select(pid, event_type, event_start_date, tablet_status, first_reminder_complete_date,
+                       ibis_coverage_start_date, ibis_coverage_end_date, after_ibis_started, ibis_inpatient,
+                       pre_ibis_inpatient, post_ibis_inpatient) 
+
+df_check %>% filter(event_type == "inpatient") %>% 
+    summarize(mean((event_start_date < first_reminder_complete_date) & pre_ibis_inpatient == 1))
+
+```
+
+
+
+#### condition barplot
+
+
+```{r}
+patients %>% 
+  select(pid, org_name, alzheimers:urologic_cancer) %>% 
+  pivot_longer(c(alzheimers:urologic_cancer), names_to = "condition", values_to = "value") %>%  mutate(org_name = if_else(org_name == "Unicare", "Unicare", "not_Unicare")) %>% 
+  group_by(condition, org_name) %>%
+  summarise(value = sum(value), n = n()) %>%
+  mutate(prop = value / n) %>%
+  ggplot(aes(x = fct_reorder(condition, -prop), y = prop, fill = org_name)) + 
+  geom_col(position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```

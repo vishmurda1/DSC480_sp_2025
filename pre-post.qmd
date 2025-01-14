@@ -1,0 +1,336 @@
+---
+title: "Unicare Pre vs Post Analysis"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r knitr, warning=FALSE, include=FALSE}
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(
+  fig.width=7.5, fig.height=4.2, fig.retina=3,
+  out.width = "100%",
+  cache = FALSE,
+  echo = FALSE,
+  message = FALSE, 
+  warning = FALSE,
+  fig.show = TRUE,
+  hiline = TRUE,
+  require("knitr")
+)
+
+```
+
+```{r, echo=FALSE, warning=FALSE, include=FALSE}
+library(survival)
+library(tidyverse)
+library(ggsurvfit)
+library(lubridate)
+library(ggfortify)
+
+library(pscl)
+
+library(broom)
+library(broom.mixed)
+
+library(readr)
+```
+
+```{r}
+term <- 180
+```
+
+## Compare pre/post ibis for patients in first `r term`  days in each period.
+
+- probability of inpatient admission 
+- Mcnemar's test for paired proportions
+- stratify above by HCC score quantiles.
+---
+
+```{r prelim_wrangle, echo = FALSE}
+setwd("~/Dropbox/Projects/Senscio/DSC480_sp_2025")
+
+#df <- read_csv("data/2024-06-17T15-18_full_dataset.csv")
+#df <- read_csv("data/2024-08-28_utilization_report.csv")
+#df <- read_csv("data/9_9utilization_events.csv")
+df <- read_csv("../data/2024-11-18_utilization_events.csv")
+
+#data_full <- df %>% mutate_at(vars(contains("date")), ~as_date(.x))
+data_full <- df %>% 
+    mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+    mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>% 
+    rename_with(~str_replace(., "timestamp", "date"), contains("timestamp"))
+
+data_full$event_type <- as.factor(data_full$event_type)
+
+levels(data_full$event_type) <- c("emergency", "inpatient", "no_utilization", "observation")
+
+
+event_table <- data_full  %>%
+    group_by(pid, event_type)  %>%
+    summarize(count = n())%>% pivot_wider(names_from = event_type, values_from = count) %>%
+    replace(is.na(.), 0)
+
+
+cov_table <- data_full %>%
+    select(pid, coverage_start_date, coverage_end_date, first_reminder_complete_date,
+           ibis_coverage_start_date, ibis_coverage_end_date) %>% distinct()
+
+ibis_yes <- cov_table %>% filter(!is.na(first_reminder_complete_date)) %>% mutate(ibis = 1)
+ibis_no <- cov_table %>% filter(is.na(first_reminder_complete_date)) %>% mutate(ibis = 0)
+ibis_yesno <- rbind(ibis_no, ibis_yes) %>% select(pid, ibis)
+
+### Get inpatient events, date of first
+
+in_first <- data_full %>% select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+      group_by(pid) %>% summarize(first_admit_date = min(event_start_date))
+
+admit_table <- cov_table %>% left_join(in_first, by = "pid")  %>%
+    left_join(ibis_yesno, by = "pid")
+
+admit_table_times <- admit_table %>%
+    mutate(pre_time = first_reminder_complete_date - coverage_start_date) %>%
+    mutate(post_time = coverage_end_date - first_reminder_complete_date)  %>%
+     filter(is.na(post_time) == FALSE) %>% # remove 711 non ibis and
+    filter(pre_time >= 0)                         #85 observations with first_reminder < coverag_start
+
+#######
+####### Start here now
+#### First admit ibis/post ibis
+
+## post ibis with admission
+post_ibis_first_in <- data_full %>% filter(event_start_date > first_reminder_complete_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(first_admit_post_ibis_date = min(event_start_date))
+
+## Add zero admissions
+cov_table <- data_full %>%
+    select(pid, coverage_start_date, coverage_end_date, first_reminder_complete_date,
+           last_reminder_complete_date) %>% distinct()
+
+
+first_admit_post_ibis_table <- cov_table %>% left_join(post_ibis_first_in, by = "pid") %>%
+    inner_join(ibis_yesno, by = "pid") %>% filter(ibis == 1)
+
+#### First admit ibis/pre ibis
+
+## pre ibis with admission
+pre_ibis_first_in <- data_full %>% filter(event_start_date < first_reminder_complete_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(first_admit_pre_ibis_date = min(event_start_date))
+
+## Add zero admissions
+
+first_admit_pre_ibis_table <- cov_table %>% left_join(pre_ibis_first_in, by = "pid") %>%
+    inner_join(ibis_yesno, by = "pid") %>% filter(ibis == 1)
+
+ibis_pre_post_dates_table <- full_join(first_admit_pre_ibis_table,
+                                       first_admit_post_ibis_table,
+                        by = c("pid", "coverage_start_date", "coverage_end_date",
+                               "first_reminder_complete_date",
+                               "last_reminder_complete_date", "ibis")) %>%
+      mutate(pre = case_when(is.na(first_admit_pre_ibis_date) ~
+                                        first_reminder_complete_date - coverage_start_date,
+                                  !is.na(first_admit_pre_ibis_date) ~
+                                  first_admit_pre_ibis_date - coverage_start_date)) %>%
+    mutate(post = case_when(is.na(first_admit_post_ibis_date) ~
+                                    last_reminder_complete_date - first_reminder_complete_date,
+                                 !is.na(first_admit_post_ibis_date) ~
+                                 first_admit_post_ibis_date - first_reminder_complete_date)) %>%
+    mutate(censor_pre = case_when(is.na(first_admit_pre_ibis_date) ~ 1,
+                                  !is.na(first_admit_pre_ibis_date) ~ 0)) %>%
+    mutate(censor_post = case_when(is.na(first_admit_post_ibis_date) ~ 1,
+                                  !is.na(first_admit_post_ibis_date) ~ 0)) %>%
+     filter(pre > 0) %>% filter(post > 0)  %>% mutate(pre_time =
+                                         first_reminder_complete_date - coverage_start_date) %>%                                 mutate(post_time =
+           last_reminder_complete_date - first_reminder_complete_date)
+
+
+#### Need to pivot longer
+
+ibis_pre_post_times_long <-
+ibis_pre_post_dates_table %>%
+    pivot_longer(c(pre, post), names_to = "period", values_to = "time") %>%
+    mutate(censor = case_when(period == "pre" ~ censor_pre,
+                              period == "post" ~ censor_post)) %>%
+    select(pid, period, time, censor)
+
+```
+## Observation times
+
+
+```{r, echo=FALSE, fig.width=6, fig.height=2}
+
+ibis_pre_post_dates_table_term <-
+ibis_pre_post_dates_table %>%
+    filter(pre_time > term & post_time > term)
+
+ibis_pre_post_times_long_term <-
+ibis_pre_post_dates_table_term %>%
+    pivot_longer(c(pre, post), names_to = "period", values_to = "time") %>%
+    mutate(censor = case_when(period == "pre" ~ censor_pre,
+                              period == "post" ~ censor_post)) %>%
+    select(pid, period, time, censor)
+
+
+```
+  
+  
+We filter patients who have been in the program for at least `r term` days in each period.  
+  
+  
+```{r, echo=FALSE, fig.width=6, fig.height=2}
+
+ibis_pre_post_dates_table_term %>% summarize(n = n(),
+                            mean_pre_time = floor(mean(pre_time)), mean_post_time = floor(mean(post_time))) %>% kable()
+```
+
+.pull-left[
+```{r}
+ibis_pre_post_dates_table_term %>%
+    tidyr::pivot_longer(cols = c(pre_time, post_time), names_to = "period", values_to = "time") %>%
+    ggplot(aes(x = time, fill = period)) +
+    geom_density(alpha = 0.4, position = 'identity') +
+    scale_fill_manual(values = c("green", "blue")) +
+    labs(x = "Days", y = "Count", fill = "period")
+
+
+```  
+]
+
+.pull-right[
+```{r}
+ibis_pre_post_dates_table_term %>%
+    tidyr::pivot_longer(cols = c(pre_time, post_time), names_to = "period", values_to = "time") %>%
+    ggplot(aes(x = period, y = time, fill = period)) +
+    geom_boxplot(alpha = 0.4) +
+    scale_fill_manual(values = c("green", "blue")) +
+    labs(x = "Period", y = "Days")
+
+
+```  
+]
+
+---
+
+## McNemar's test for change in proportion of admissions
+
+(currently editing)
+
+```{r}
+ibis_pre_post_dates_table_180 <-
+    ibis_pre_post_dates_table %>%
+    filter(pre_time > term & post_time > term)
+
+ibis_pre_post_times_long_180 <-
+    ibis_pre_post_dates_table_180 %>%
+    pivot_longer(c(pre, post), names_to = "period", values_to = "time") %>%
+    mutate(censor = case_when(period == "pre" ~ censor_pre,
+                              period == "post" ~ censor_post)) %>%
+    select(pid, period, time, censor) %>%
+      mutate(admit = ifelse(time <= term, 1, 0))
+
+```
+
+
+```{r, echo=FALSE}
+mcr <- ibis_pre_post_times_long_180 %>%
+    select(pid, period, admit) %>%
+    pivot_wider(names_from = period, values_from = admit)
+
+mcr_table_data <- table(mcr$pre, mcr$post)
+
+mcr_matrix <- as.matrix(mcr_table_data)
+dimnames(mcr_matrix) <- list(c("no", "yes"), c("no", "yes"))
+names(dimnames(mcr_matrix)) <- c("pre", "post")
+
+print(mcr_matrix) 
+mcnemar.test(mcr_table_data)
+
+
+```
+
+---
+
+## Emergency room visits
+
+**Does not take into account the paired nature of the data**
+
+#### Zero-inflated model
+
+- Binomial model for zero vs non-zero
+- Poisson model for count of visits
+
+Both parts of the model contribute to zero counts 
+
+---
+
+#### Zero-inflated model, ER counts
+
+**Does not take into account the paired nature of the data**
+
+```{r, echo = FALSE}
+
+ibis_term <- ibis_pre_post_dates_table_term %>% select(pid)
+
+emergency_count_pre <- data_full %>% filter(event_type == "emergency") %>%
+    mutate(period = case_when(first_reminder_complete_date - term <  event_start_date &
+                         event_start_date < first_reminder_complete_date ~ "pre",
+                         first_reminder_complete_date <  event_start_date &
+                             event_start_date < first_reminder_complete_date + term ~ "post")) %>% 
+    select(pid, period) 
+
+emergency_counts <- ibis_term %>% left_join(emergency_count_pre, by = "pid") %>% group_by(pid, period) %>% 
+    summarize(count = n()) %>% pivot_wider(names_from = period, values_from = count) %>%
+    select(pid, pre, post) %>% replace(is.na(.), 0) 
+
+emergency_counts_long <- emergency_counts %>%
+    pivot_longer(cols = c(pre, post), names_to = "period", values_to = "count")
+    
+```
+
+
+```{r}
+fit <- zeroinfl(count ~ period, data = emergency_counts_long, dist = "poisson")
+
+summary(fit)
+```
+
+
+#### Wilcoxson's
+
+**Now take into account the paired nature of the data**
+
+```{r, echo = FALSE}
+
+inpatient_admits_pre <- data_full %>% filter(event_type == "inpatient") %>%
+    mutate(period = case_when(first_reminder_complete_date - term <  event_start_date &
+                         event_start_date < first_reminder_complete_date ~ "pre",
+                         first_reminder_complete_date <  event_start_date &
+                             event_start_date < first_reminder_complete_date + term ~ "post")) %>% 
+    select(pid, period) 
+
+admits_counts <- ibis_term %>% left_join(inpatient_admits_pre, by = "pid") %>% group_by(pid, period) %>% 
+    summarize(count = n()) %>% pivot_wider(names_from = period, values_from = count) %>%
+    select(pid, pre, post) %>% replace(is.na(.), 0) 
+
+inpatient_admits_long <- admits_counts %>%
+    pivot_longer(cols = c(pre, post), names_to = "period", values_to = "count")
+    
+```
+
+**Mean number of admissions**
+
+```{r}
+inpatient_admits_long %>% group_by(period) %>% 
+    summarize(mean_pre = mean(count)) %>% kable()
+```
+
+
+```{r}
+wilcox.test(admits_counts$post, admits_counts$pre, data = inpatient_admits_long, paired = TRUE)
+```
+
