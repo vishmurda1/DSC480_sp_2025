@@ -17,7 +17,7 @@
 *.synctex.gz
 *.toc
 *.tex
-*.md
+#*.md
 _quarto.yml
 .Rproj.user/
 
