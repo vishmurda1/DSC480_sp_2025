@@ -18,7 +18,7 @@
 *.toc
 *.tex
 *.md
-_quarto/
+_quarto.yml
 .Rproj.user/
 
 ###
@@ -27,3 +27,5 @@ _quarto/
 *_freeze
 *.json
 .DS_Store
+
+/.quarto/

@@ -152,7 +152,6 @@ You ***must*** complete this to continue in the course!
 -   Complete CITI training
 -   Computational setup
 
-
 ## Modeling
 
 -   Poisson regression for count data
@@ -170,6 +169,5 @@ You ***must*** complete this to continue in the course!
 
 -   Confirm consistency of summary data - are we getting what they are?
 -   Summary statistics on populations
-
 
 (See the notes in course repo.)

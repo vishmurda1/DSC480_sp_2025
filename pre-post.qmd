@@ -1,7 +1,7 @@
 ---
 title: "Unicare Pre vs Post Analysis"
 format: html
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(
   out.width = "100%",
   cache = FALSE,
   echo = FALSE,
-  message = FALSE, 
+  message = FALSE,
   warning = FALSE,
   fig.show = TRUE,
   hiline = TRUE,
@@ -40,12 +40,13 @@ library(readr)
 term <- 180
 ```
 
-## Compare pre/post ibis for patients in first `r term`  days in each period.
+## Compare pre/post ibis for patients in first `r term` days in each period.
 
-- probability of inpatient admission 
-- Mcnemar's test for paired proportions
-- stratify above by HCC score quantiles.
----
+-   probability of inpatient admission
+
+-   Mcnemar's test for paired proportions
+
+-   \## stratify above by HCC score quantiles.
 
 ```{r prelim_wrangle, echo = FALSE}
 setwd("~/Dropbox/Projects/Senscio/DSC480_sp_2025")
@@ -56,9 +57,9 @@ setwd("~/Dropbox/Projects/Senscio/DSC480_sp_2025")
 df <- read_csv("../data/2024-11-18_utilization_events.csv")
 
 #data_full <- df %>% mutate_at(vars(contains("date")), ~as_date(.x))
-data_full <- df %>% 
+data_full <- df %>%
     mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
-    mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>% 
+    mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
     rename_with(~str_replace(., "timestamp", "date"), contains("timestamp"))
 
 data_full$event_type <- as.factor(data_full$event_type)
@@ -159,8 +160,8 @@ ibis_pre_post_dates_table %>%
     select(pid, period, time, censor)
 
 ```
-## Observation times
 
+## Observation times
 
 ```{r, echo=FALSE, fig.width=6, fig.height=2}
 
@@ -177,18 +178,17 @@ ibis_pre_post_dates_table_term %>%
 
 
 ```
-  
-  
-We filter patients who have been in the program for at least `r term` days in each period.  
-  
-  
+
+We filter patients who have been in the program for at least `r term` days in each period.
+
 ```{r, echo=FALSE, fig.width=6, fig.height=2}
 
 ibis_pre_post_dates_table_term %>% summarize(n = n(),
                             mean_pre_time = floor(mean(pre_time)), mean_post_time = floor(mean(post_time))) %>% kable()
 ```
 
-.pull-left[
+.pull-left\[
+
 ```{r}
 ibis_pre_post_dates_table_term %>%
     tidyr::pivot_longer(cols = c(pre_time, post_time), names_to = "period", values_to = "time") %>%
@@ -198,10 +198,12 @@ ibis_pre_post_dates_table_term %>%
     labs(x = "Days", y = "Count", fill = "period")
 
 
-```  
-]
+```
 
-.pull-right[
+\]
+
+.pull-right\[
+
 ```{r}
 ibis_pre_post_dates_table_term %>%
     tidyr::pivot_longer(cols = c(pre_time, post_time), names_to = "period", values_to = "time") %>%
@@ -211,10 +213,11 @@ ibis_pre_post_dates_table_term %>%
     labs(x = "Period", y = "Days")
 
 
-```  
-]
+```
 
----
+\]
+
+------------------------------------------------------------------------
 
 ## McNemar's test for change in proportion of admissions
 
@@ -235,7 +238,6 @@ ibis_pre_post_times_long_180 <-
 
 ```
 
-
 ```{r, echo=FALSE}
 mcr <- ibis_pre_post_times_long_180 %>%
     select(pid, period, admit) %>%
@@ -247,13 +249,13 @@ mcr_matrix <- as.matrix(mcr_table_data)
 dimnames(mcr_matrix) <- list(c("no", "yes"), c("no", "yes"))
 names(dimnames(mcr_matrix)) <- c("pre", "post")
 
-print(mcr_matrix) 
+print(mcr_matrix)
 mcnemar.test(mcr_table_data)
 
 
 ```
 
----
+------------------------------------------------------------------------
 
 ## Emergency room visits
 
@@ -261,12 +263,12 @@ mcnemar.test(mcr_table_data)
 
 #### Zero-inflated model
 
-- Binomial model for zero vs non-zero
-- Poisson model for count of visits
+-   Binomial model for zero vs non-zero
+-   Poisson model for count of visits
 
-Both parts of the model contribute to zero counts 
+Both parts of the model contribute to zero counts
 
----
+------------------------------------------------------------------------
 
 #### Zero-inflated model, ER counts
 
@@ -280,25 +282,23 @@ emergency_count_pre <- data_full %>% filter(event_type == "emergency") %>%
     mutate(period = case_when(first_reminder_complete_date - term <  event_start_date &
                          event_start_date < first_reminder_complete_date ~ "pre",
                          first_reminder_complete_date <  event_start_date &
-                             event_start_date < first_reminder_complete_date + term ~ "post")) %>% 
-    select(pid, period) 
+                             event_start_date < first_reminder_complete_date + term ~ "post")) %>%
+    select(pid, period)
 
-emergency_counts <- ibis_term %>% left_join(emergency_count_pre, by = "pid") %>% group_by(pid, period) %>% 
+emergency_counts <- ibis_term %>% left_join(emergency_count_pre, by = "pid") %>% group_by(pid, period) %>%
     summarize(count = n()) %>% pivot_wider(names_from = period, values_from = count) %>%
-    select(pid, pre, post) %>% replace(is.na(.), 0) 
+    select(pid, pre, post) %>% replace(is.na(.), 0)
 
 emergency_counts_long <- emergency_counts %>%
     pivot_longer(cols = c(pre, post), names_to = "period", values_to = "count")
-    
-```
 
+```
 
 ```{r}
 fit <- zeroinfl(count ~ period, data = emergency_counts_long, dist = "poisson")
 
 summary(fit)
 ```
-
 
 #### Wilcoxson's
 
@@ -310,27 +310,25 @@ inpatient_admits_pre <- data_full %>% filter(event_type == "inpatient") %>%
     mutate(period = case_when(first_reminder_complete_date - term <  event_start_date &
                          event_start_date < first_reminder_complete_date ~ "pre",
                          first_reminder_complete_date <  event_start_date &
-                             event_start_date < first_reminder_complete_date + term ~ "post")) %>% 
-    select(pid, period) 
+                             event_start_date < first_reminder_complete_date + term ~ "post")) %>%
+    select(pid, period)
 
-admits_counts <- ibis_term %>% left_join(inpatient_admits_pre, by = "pid") %>% group_by(pid, period) %>% 
+admits_counts <- ibis_term %>% left_join(inpatient_admits_pre, by = "pid") %>% group_by(pid, period) %>%
     summarize(count = n()) %>% pivot_wider(names_from = period, values_from = count) %>%
-    select(pid, pre, post) %>% replace(is.na(.), 0) 
+    select(pid, pre, post) %>% replace(is.na(.), 0)
 
 inpatient_admits_long <- admits_counts %>%
     pivot_longer(cols = c(pre, post), names_to = "period", values_to = "count")
-    
+
 ```
 
 **Mean number of admissions**
 
 ```{r}
-inpatient_admits_long %>% group_by(period) %>% 
+inpatient_admits_long %>% group_by(period) %>%
     summarize(mean_pre = mean(count)) %>% kable()
 ```
-
 
 ```{r}
 wilcox.test(admits_counts$post, admits_counts$pre, data = inpatient_admits_long, paired = TRUE)
 ```
-
