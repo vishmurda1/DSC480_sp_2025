@@ -15,8 +15,6 @@ events <- read_csv("../data/events_toy.csv")
 report <- read_csv("../data/report_toy.csv")
 
 
-
-
 ## A bit of cleaning
 events_full <- events %>%
   mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%

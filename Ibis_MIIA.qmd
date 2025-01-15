@@ -49,17 +49,20 @@ library(broom.mixed)
 #| echo: false
 #| label: read-files
 
-source("data_read.R")
+source("read_clean.R")
 
 ```
 
 ```{r}
-#| label: get-unicare-patients
 
-term <- 0  ## number of days using ibis. Eventually we will want set threshold.
+
+### Eventually will want to filter patients under observation for min number of days,
+###
+
+term <- 0
 lag <- term
 
-ibis_term <- df %>%
+ibis_term <- events_full %>%
     filter(str_detect(org_name, "Unicare")) %>%
     filter(last_reminder_complete_date - first_reminder_complete_date > term) %>%
     mutate(days = last_reminder_complete_date - first_reminder_complete_date)
@@ -67,37 +70,20 @@ ibis_term <- df %>%
 ibis_patients_term <- ibis_term %>%
     select(pid) %>% distinct() %>% mutate(cohort = "Unicare")
 
+
 ```
 
 ```{r, echo=FALSE}
 #| label: MIIA term
 
-# Note for the Aug 2024 data none of the MIIA were no-ibis
 
-MIIA_term_no_ibis <- df %>% filter(str_detect(org_name, "MIIA")) %>%
-    filter(is.na(first_reminder_complete_date)) %>%
-    filter(coverage_end_date - coverage_start_date > term) %>%
-    mutate(days = coverage_end_date - coverage_start_date)
-
-MIIA_patients_term_no_ibis <- MIIA_term_no_ibis %>%
-    select(pid) %>% distinct()
-
-MIIA_term_ibis <- df %>% filter(str_detect(org_name, "MIIA")) %>%
-    filter(!is.na(first_reminder_complete_date)) %>%
+MIIA_term <- events_full %>% filter(str_detect(org_name, "MIIA")) %>%
     filter(first_reminder_complete_date - coverage_start_date > term) %>%
     mutate(days = first_reminder_complete_date - coverage_start_date)
 
-MIIA_patients_term_ibis <- MIIA_term_ibis %>%
-    select(pid) %>% distinct()
-
-MIIA_patients_term <- rbind(MIIA_patients_term_no_ibis, MIIA_patients_term_ibis)  %>%
+MIIA_patients_term <- MIIA_term %>%
+    select(pid) %>% distinct() %>%
     mutate(cohort = "MIIA")
-
-MIIA_term <- rbind(MIIA_term_no_ibis, MIIA_term_ibis) # %>%
-    # mutate(group = ifelse(pid %in% MIIA_patients_term_ibis$pid, "pre Ibis", "no Ibis"))
-
-###
-
 
 ```
 
@@ -105,7 +91,7 @@ MIIA_term <- rbind(MIIA_term_no_ibis, MIIA_term_ibis) # %>%
 #| label: ibis_events
 ### Ibis summaries
 ## round inpatient days
-ibis_events <- df %>%
+ibis_events <- events_full %>%
     filter(term == 0 & event_start_date > first_reminder_complete_date |
            term != 0 & event_start_date > first_reminder_complete_date &
                        event_start_date < first_reminder_complete_date + term)
@@ -147,62 +133,22 @@ ibis_event_summary <- ibis_patients_term %>% left_join(ibis_events_pre, by = "pi
 
   ## ultimately
 
-MIIA_events_no_ibis <- MIIA_term_no_ibis %>%
-    filter(term == 0 & event_start_date > coverage_start_date |
-           term !=0 & event_start_date > coverage_start_date &
-                      event_start_date < coverage_start_date + lag)
 
-
-MIIA_events_ibis <- MIIA_term_ibis %>%
+MIIA_events <- MIIA_term %>%
     filter(term == 0 & event_start_date < first_reminder_complete_date |
            term !=0 & event_start_date < first_reminder_complete_date &
                       event_start_date < coverage_start_date + lag)
-### Old:
-####
-#MIIA_events_no_ibis <- MIIA_term_no_ibis # %>%
-   # filter(event_start_date < coverage_start_date  + lag)
-
-   #MIIA_events_ibis <- MIIA_term_ibis %>%
-  #  filter(event_start_date < coverage_start_date + lag) %>%
-    #filter(event_start_date < first_reminder_complete_date) # Wont need to do this when term>0 and lag = term
- ###
-####
-```
-
-```{r}
-### This breaks if one of the outcomes does not appear; eg. if term is large.
-MIIA_events <- rbind(MIIA_events_no_ibis, MIIA_events_ibis)
-
-event_list <- c("emergency", "inpatient") ## in case one or more are missing. But creates NA column
-
-MIIA_counts <- MIIA_events %>%
-    mutate(event_type = factor(event_type, levels = event_list)) %>%
-    group_by(pid, event_type)  %>%
-    summarize(count = n(), .groups = "drop") %>%
-    pivot_wider(names_from = event_type, values_from = count) %>%
-    replace(is.na(.), 0)
-
-MIIA_admit_days <- MIIA_events %>%
-     group_by(pid) %>% summarize(inpatient_days = round(sum(event_duration_days), 0))
-
-MIIA_events_pre <- MIIA_counts %>%
-    full_join(MIIA_admit_days, by = "pid")
-
-MIIA_event_summary <- MIIA_patients_term %>% left_join(MIIA_events_pre, by = "pid") %>%
-    replace(is.na(.), 0) %>%
-    select(pid, emergency, inpatient, inpatient_days)
-
 
 ```
+
 
 ```{r, echo=FALSE}
-#| label: patient data
+#| label: patient-data
 ## Get patient data, HCC scores, observation times
 
-df_aug <- read_csv("../data/2024-08-28_utilization_report.csv")
 
-idx_0 <- which(names(df_aug) == "condition_count")
- idx_1 <- which(names(df_aug) == "urologic_cancer")
+idx_0 <- which(names(report_full) == "condition_count")
+ idx_1 <- which(names(report_full) == "urologic_cancer")
 
  cohorts <- rbind(ibis_patients_term, MIIA_patients_term)
 
