@@ -7,3 +7,6 @@ events_toy <- events |> mutate(across(everything(), ~sample(.x)))
 
 write_csv(report_toy, "report_toy.csv")
 write_csv(events_toy, "events_toy.csv")
+
+## put a comment
+
