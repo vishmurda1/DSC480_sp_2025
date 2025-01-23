@@ -30,3 +30,5 @@ report_full <- report %>%
   rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
     mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |>
   mutate(across(event_type, ~as.factor(.x)))
+
+## add comment
