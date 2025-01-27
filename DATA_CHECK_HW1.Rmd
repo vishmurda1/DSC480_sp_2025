@@ -1,8 +1,0 @@
----
-title: "DATA_CHECK_HW1"
-author: "Vishal"
-date: "2025-01-27"
-output: pdf_document
----
-
-1.  
