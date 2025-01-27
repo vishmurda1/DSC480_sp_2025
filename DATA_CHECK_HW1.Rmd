@@ -5,6 +5,11 @@ date: "2025-01-27"
 output: pdf_document
 ---
 
+```{r}
+# Load libraries
+library(tidyverse)  
+```
+
 # DSC 480: Initial Tasks# 1. Computational Setup- Set up IDEs, GitHub repos, forked, and cloned the repository to the local machine.
 
 ## 2. Summary Statistics and Exploratory Analysis, calculate summary statistics for the 'events' and 'report' tables. 
@@ -14,8 +19,14 @@ this is going to help us understand the distribution of data
 -   we gotta import the data from 'read_clean.R'
 
 ```{r}
-events <- read_csv("events_toy.csv")
-report <- read_csv("report_toy.csv")
+setwd("/Users/vishmurda/DSC480_GitHub_Repository")
+getwd
+
+```
+
+```{r}
+events <- read_csv("/Users/vishmurda/DSC480_GitHub_Repository/events_toy.csv")
+report <- read_csv("/Users/vishmurda/DSC480_GitHub_Repository/report_toy.csv")
 ```
 
 -   now we gotta compute the summary statistics for both of the datasets
@@ -284,7 +295,9 @@ events_full %>%
     x = "Organization",
     y = "Admissions Count",
     fill = "Period"
-  )
+      
+  ) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 
 ```
 
