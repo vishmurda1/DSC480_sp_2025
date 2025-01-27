@@ -12,7 +12,7 @@ library(tidyverse)
 
 # DSC 480: Initial Tasks# 1. Computational Setup- Set up IDEs, GitHub repos, forked, and cloned the repository to the local machine.
 
-## 2. Summary Statistics and Exploratory Analysis, calculate summary statistics for the 'events' and 'report' tables. 
+## 2. Summary Statistics and Exploratory Analysis, calculate summary statistics for the 'events' and 'report' tables.
 
 this is going to help us understand the distribution of data
 
