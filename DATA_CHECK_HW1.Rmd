@@ -121,8 +121,80 @@ pre_ibis_admissions_count <- events_full %>%
   right_join(patients, by = "pid") %>%                      # Include all patients, even those with zero admissions
   mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))  # Replace NA counts with 0
 
-head(pre_ibis_admissions_count)
+pre_ibis_admissions_count
 
+post_ibis_admissions_count <- events_full %>%
+  filter(event_start_date > ibis_coverage_start_date) %>%   # Filter for events after Ibis coverage started
+  filter(event_start_date <= ibis_coverage_end_date) %>%    # Ensure events are within the Ibis coverage period
+  select(pid, event_type, event_start_date) %>%             # Select relevant columns
+  filter(event_type == "inpatient") %>%                     # Filter for inpatient events
+  group_by(pid) %>%                                         # Group by patient ID
+  summarize(admit_count = n()) %>%                          # Count the number of admissions per patient
+  right_join(patients, by = "pid") %>%                      # Include all patients, even those with zero admissions
+  mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))  # Replace NA counts with 0
+
+post_ibis_admissions_count
+
+str(events_full)
+summary(events_full$event_start_date)
+summary(events_full$ibis_coverage_start_date)
+summary(events_full$ibis_coverage_end_date)
+
+
+#pre-ibis admissions for unicare group
+pre_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% 
+    summarize(unicare_pre_admits  = sum(admit_count))
+
+#total pre-Ibis admissions for all groups
+pre_ibis_admissions_count %>%
+  summarize(total_pre_admits_all = sum(admit_count, na.rm = TRUE))
+
+
+post_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>%
+    summarize(unicare_post_admits = sum(admit_count))
+
+post_ibis_admissions_count %>%
+  summarize(total_post_admits_all = sum(admit_count, na.rm = TRUE))
+
+
+
+# Combines the results into a single tibble
+admissions_summary <- tibble(
+  Group = c("Unicare - Study", "All Groups"),
+  Pre_Ibis_Admissions = c(
+    pre_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% summarize(sum(admit_count)) %>% pull(),
+    pre_ibis_admissions_count %>% summarize(sum(admit_count, na.rm = TRUE)) %>% pull()
+  ),
+  Post_Ibis_Admissions = c(
+    post_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% summarize(sum(admit_count)) %>% pull(),
+    post_ibis_admissions_count %>% summarize(sum(admit_count, na.rm = TRUE)) %>% pull()
+  )
+)
+
+print(admissions_summary)
+
+
+```
+
+```{r}
+# Reshape data for plotting
+admissions_summary_long <- admissions_summary %>%  # Start with the admissions_summary table
+  pivot_longer(                                   # Use pivot_longer to reshape the data from wide to long format
+    cols = c(Pre_Ibis_Admissions, Post_Ibis_Admissions), # Specify the columns to "gather" (pre- and post-Ibis admissions)
+    names_to = "Period",                         # Create a new column named "Period" to store the column names
+    values_to = "Admissions"                     # Create a new column named "Admissions" to store the corresponding values
+  )
+
+# Plot
+ggplot(admissions_summary_long, aes(x = Group, y = Admissions, fill = Period)) +  # Create a ggplot object
+  geom_bar(stat = "identity", position = "dodge") +  # Add a bar plot with identity stat (use raw values) and "dodge" to create side-by-side bars
+  theme_minimal() +                                  # Apply a minimal theme for a clean look
+  labs(                                              # Add labels to the plot
+    title = "Pre- and Post-Ibis Admissions",         # Title of the plot
+    x = "Group",                                     # Label for the x-axis
+    y = "Admissions Count",                          # Label for the y-axis
+    fill = "Period"                                  # Legend title for the fill (colors) representing "Period"
+  )
 ```
 
 ```{r}
