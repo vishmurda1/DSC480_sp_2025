@@ -129,7 +129,7 @@ pre_ibis_admissions_count <- events_full %>%
   filter(event_type == "inpatient") %>%                     # Filter for inpatient events
   group_by(pid) %>%                                         # Group by patient ID
   summarize(admit_count = n()) %>%                          # Count the number of admissions per patient
-  right_join(patients, by = "pid") %>%                      # Include all patients, even those with zero admissions
+  right_join(report_full, by = "pid") %>%                      # Include all patients, even those with zero admissions
   mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))  # Replace NA counts with 0
 
 pre_ibis_admissions_count
@@ -141,7 +141,7 @@ post_ibis_admissions_count <- events_full %>%
   filter(event_type == "inpatient") %>%                     # Filter for inpatient events
   group_by(pid) %>%                                         # Group by patient ID
   summarize(admit_count = n()) %>%                          # Count the number of admissions per patient
-  right_join(patients, by = "pid") %>%                      # Include all patients, even those with zero admissions
+  right_join(report_full, by = "pid") %>%                      # Include all patients, even those with zero admissions
   mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))  # Replace NA counts with 0
 
 post_ibis_admissions_count
