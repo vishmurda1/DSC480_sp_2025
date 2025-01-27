@@ -235,14 +235,61 @@ report_full %>%
     all_member_post_total = sum(post_ibis_covered_days_check)  # Sum the total post-Ibis coverage days for all members
   )
 
+# Pre-Ibis coverage days for Unicare group
+unicare_pre_coverage <- report_full %>%
+  filter(org_name == "Unicare - Study") %>%  # Filter for Unicare group
+  summarize(unicare_pre_days = sum(ibis_coverage_start_date - coverage_start_date, na.rm = TRUE))  # Calculate total pre-Ibis days
 
+# Total Pre-Ibis coverage days for all groups
+all_pre_coverage <- report_full %>%
+  summarize(total_pre_days = sum(ibis_coverage_start_date - coverage_start_date, na.rm = TRUE))  # Calculate total pre-Ibis days for all groups
+
+# Post-Ibis coverage days for Unicare group
+unicare_post_coverage <- report_full %>%
+  filter(org_name == "Unicare - Study") %>%  # Filter for Unicare group
+  summarize(unicare_post_days = sum(ibis_coverage_end_date - ibis_coverage_start_date, na.rm = TRUE))  # Calculate total post-Ibis days
+
+# Total Post-Ibis coverage days for all groups
+all_post_coverage <- report_full %>%
+  summarize(total_post_days = sum(ibis_coverage_end_date - ibis_coverage_start_date, na.rm = TRUE))  # Calculate total post-Ibis days for all groups
+
+# Combine results into a single tibble
+coverage_summary <- tibble(
+  Group = c("Unicare - Study", "All Groups"),  # Define the groups
+  Pre_Ibis_Coverage_Days = c(
+    unicare_pre_coverage$unicare_pre_days,  # Pre-Ibis days for Unicare
+    all_pre_coverage$total_pre_days         # Pre-Ibis days for all groups
+  ),
+  Post_Ibis_Coverage_Days = c(
+    unicare_post_coverage$unicare_post_days,  # Post-Ibis days for Unicare
+    all_post_coverage$total_post_days         # Post-Ibis days for all groups
+  )
+)
+
+# Print the final summary table
+print(coverage_summary)
+
+
+# Admissions count bar plot
+events_full %>%
+  filter(event_type == "inpatient") %>%  # Filter for inpatient events
+  mutate(period = ifelse(event_start_date <= ibis_coverage_start_date, "Pre-Ibis", "Post-Ibis")) %>%  # Define period
+  group_by(org_name, period) %>%  # Group by organization and period
+  summarize(admissions_count = n(), .groups = "drop") %>%  # Count admissions
+  ggplot(aes(x = org_name, y = admissions_count, fill = period)) +
+  geom_bar(stat = "identity", position = "dodge") +  # Create side-by-side bars
+  theme_minimal() +  # Apply a minimal theme
+  labs(
+    title = "Admissions Count by Period",
+    x = "Organization",
+    y = "Admissions Count",
+    fill = "Period"
+  )
 
 ```
 
 ```{r}
-#- Recreate the admissions count bar plots.
 
-#---
 
 ## 4. Descriptive Statistics for Combined Groups
 ### Goals
