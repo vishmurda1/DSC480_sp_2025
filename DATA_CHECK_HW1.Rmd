@@ -1,0 +1,160 @@
+---
+title: "DATA_CHECK_HW1"
+author: "Vishal"
+date: "2025-01-27"
+output: pdf_document
+---
+
+# DSC 480: Initial Tasks# 1. Computational Setup- Set up IDEs, GitHub repos, forked, and cloned the repository to the local machine.
+
+## 2. Summary Statistics and Exploratory Analysis, calculate summary statistics for the 'events' and 'report' tables. 
+
+this is going to help us understand the distribution of data
+
+-   we gotta import the data from 'read_clean.R'
+
+```{r}
+events <- read_csv("events_toy.csv")
+report <- read_csv("report_toy.csv")
+```
+
+-   now we gotta compute the summary statistics for both of the datasets
+
+    ```{r}
+    head(summary(events))
+    head(summary(report))
+    ```
+
+    -   cleaning the data( took this from clean data)
+
+```{r}
+events_full <- events %>% # Converting Timestamps to Date Format
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>% # Renaming Columns
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+  mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |> # Cleaning event_type Strings
+  mutate(across(event_type, ~as.factor(.x))) #Converting event_type to Factor
+
+
+report_full <- report %>%
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>% # Converting Timestamps to Date Format
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>% #Renaming Columns
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+    mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |> #Cleaning event_type Strings
+  mutate(across(event_type, ~as.factor(.x))) #Converting event_type to Factor
+
+sum(is.na(events_full$event_start_date)) # check if any rows have NA values due to invalid timestamp formats
+```
+
+print out the summary of the cleaned data
+
+```{r}
+summary(events_full)
+```
+
+now for the other file
+
+```{r}
+summary(report_full)
+```
+
+```{r}
+summary(events_full$event_start_date) 
+summary(report_full$event_start_date)
+```
+
+some visualizations
+
+```{r}
+ggplot(events_full, aes(x = event_type)) +        # Sets up the ggplot with events_full dataset and maps  the event_type to the x axis
+  geom_bar(fill = "lightblue") +                 # Creates a bar plot with bars filled in light blue
+  theme_minimal() +                              # Applies a minimal theme
+  labs(                                          # Add labels for the title, x-axis and y-axis
+    title = "Count of Events by Type",
+    x = "Event Type",
+    y = "Count"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels by 45° for better readability
+```
+
+```{r}
+ggplot(events_full, aes(x = coverage_duration_days)) +  # Maps coverage_duration_days to the x-axis
+  geom_histogram(                                       # Adds a histogram 
+    binwidth = 50,                                      # Sets the bin width to group the data into intervals of 50 days
+    fill = "orange",                                # Fills the bars with  orange color
+    color = "black"                                     # Outlines  the bars in black
+  ) +
+  theme_minimal() +                                     # Apply aminimal theme
+  labs(                                                 # Add labels to the title, x-axis and y-axis
+    title = "Distribution of Coverage Duration Days",
+    x = "Coverage Duration (Days)",
+    y = "Count"
+  )
+```
+
+```{r}
+ggplot(events_full, aes(x = coverage_duration_days, y = event_duration_days)) +  # Maps coverage_duration_days to xaxis and event_duration_days to yaxis
+  geom_point(alpha = 0.4, fill = "red", color = "lightgreen") +  # Add points with some transparency (alpha),(this helps with overlapping so you can see better and all the other points), and  we set color to green
+  theme_minimal() +                              # Applies a minimal theme
+  labs(                                          # Add labels for the title, x-axis, and y-axis
+    title = "Coverage Duration vs. Event Duration",
+    x = "Coverage Duration (Days)",
+    y = "Event Duration (Days)"
+  )
+```
+
+```{r}
+# Filter for Ibis and Pre-Ibis events
+ibis_events <- events_full %>% filter(ibis_observation == 1)  # Events during Ibis
+pre_ibis_events <- events_full %>% filter(non_ibis_observation == 1)  # Events before Ibis
+
+head(ibis_events)
+head(pre_ibis_events)
+
+pre_ibis_admissions_count <- events_full %>%
+  filter(event_start_date <= ibis_coverage_start_date) %>%  # Filter for events before Ibis coverage started
+  filter(event_start_date >= coverage_start_date) %>%       # Ensure events are after the general coverage start
+  select(pid, event_type, event_start_date) %>%             # Select relevant columns
+  filter(event_type == "inpatient") %>%                     # Filter for inpatient events
+  group_by(pid) %>%                                         # Group by patient ID
+  summarize(admit_count = n()) %>%                          # Count the number of admissions per patient
+  right_join(patients, by = "pid") %>%                      # Include all patients, even those with zero admissions
+  mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))  # Replace NA counts with 0
+
+head(pre_ibis_admissions_count)
+
+```
+
+```{r}
+
+## 3. Check Erik's Values
+### Task
+Compare the calculated summary statistics and exploratory results to the Google Doc values to ensure accuracy. 
+
+Relevant comparisons:
+- Total admissions on Ibis vs. Pre-Ibis.
+- Coverage days on Ibis vs. Pre-Ibis.
+- Recreate the admissions count bar plots.
+
+---
+
+## 4. Descriptive Statistics for Combined Groups
+### Goals
+Perform descriptive statistics for the `Unicare-study` group using Ibis and compare it to the combined dataset when Ibis is not used (MIIA).
+
+### Key Metrics
+1. Total days under observation.
+2. Total inpatient days.
+3. Proportion of patients with at least one inpatient admission.
+4. Counts of inpatient admissions.
+
+---
+
+## 5. Data Cleaning Function
+### Goal
+Create a function that reads and cleans data, using the logic in `read_clean.R`.
+
+read_clean_data <- function(file) {
+  # Add code here based on `read_clean.R`
+}
+```
