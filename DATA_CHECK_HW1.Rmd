@@ -198,35 +198,70 @@ ggplot(admissions_summary_long, aes(x = Group, y = Admissions, fill = Period)) +
 ```
 
 ```{r}
+admissions_summary <- admissions_summary %>%
+  mutate(
+    Percent_Change = ((Post_Ibis_Admissions - Pre_Ibis_Admissions) / Pre_Ibis_Admissions) * 100
+  )
 
-## 3. Check Erik's Values
-### Task
-Compare the calculated summary statistics and exploratory results to the Google Doc values to ensure accuracy. 
+print(admissions_summary)
+```
 
-Relevant comparisons:
-- Total admissions on Ibis vs. Pre-Ibis.
-- Coverage days on Ibis vs. Pre-Ibis.
-- Recreate the admissions count bar plots.
+now we got to do the same thing but for coverage on preibis vs post ibis
 
----
+```{r}
+####### 
+
+
+# Pre- and Post-Ibis Coverage Days for Unicare - Study
+report_full %>% 
+  filter(ibis_coverage_start_date >= coverage_start_date) %>%  # Filter rows where Ibis coverage started after or on the general coverage start date
+  mutate(pre_ibis_covered_days_check = ibis_coverage_start_date - coverage_start_date) %>%  # Calculate the days covered before Ibis started
+  mutate(post_ibis_covered_days_check = ibis_coverage_end_date - ibis_coverage_start_date) %>%  # Calculate the days covered during Ibis
+  select(pid, org_name, pre_ibis_covered_days_check, post_ibis_covered_days_check) %>%  # Select relevant columns for the calculation
+  filter(org_name == "Unicare - Study") %>%  # Filter data to include only the Unicare - Study group
+  summarize(
+    unicare_pre_total = sum(pre_ibis_covered_days_check),  # Sum up the total pre-Ibis coverage days for Unicare members
+    unicare_post_total = sum(post_ibis_covered_days_check)  # Sum up the total post-Ibis coverage days for Unicare members
+  )
+
+# Calculate Pre- and Post-Ibis Coverage Days for All Members
+report_full %>% 
+  filter(ibis_coverage_start_date >= coverage_start_date) %>%  # Filter rows where Ibis coverage started after or on the general coverage start date
+  mutate(pre_ibis_covered_days_check = ibis_coverage_start_date - coverage_start_date) %>%  # Calculate pre-Ibis coverage days
+  mutate(post_ibis_covered_days_check = ibis_coverage_end_date - ibis_coverage_start_date) %>%  # Calculate post-Ibis coverage days
+  select(pid, org_name, pre_ibis_covered_days_check, post_ibis_covered_days_check) %>%  # Select relevant columns
+  summarize(
+    all_member_pre_total = sum(pre_ibis_covered_days_check),  # Sum the total pre-Ibis coverage days for all members
+    all_member_post_total = sum(post_ibis_covered_days_check)  # Sum the total post-Ibis coverage days for all members
+  )
+
+
+
+```
+
+```{r}
+#- Recreate the admissions count bar plots.
+
+#---
 
 ## 4. Descriptive Statistics for Combined Groups
 ### Goals
-Perform descriptive statistics for the `Unicare-study` group using Ibis and compare it to the combined dataset when Ibis is not used (MIIA).
+#Perform descriptive statistics for the `Unicare-study` group using Ibis and compare it to the combined dataset when Ibis is not used (MIIA).
 
 ### Key Metrics
-1. Total days under observation.
-2. Total inpatient days.
-3. Proportion of patients with at least one inpatient admission.
-4. Counts of inpatient admissions.
+#1. Total days under observation.
+#2. Total inpatient days.
+#3. Proportion of patients with at least one inpatient admission.
+#4. Counts of inpatient admissions.
 
----
+#---
 
 ## 5. Data Cleaning Function
 ### Goal
-Create a function that reads and cleans data, using the logic in `read_clean.R`.
+#Create a function that reads and cleans data, using the logic in `read_clean.R`.
 
-read_clean_data <- function(file) {
+#```r
+#read_clean_data <- function(file) {
   # Add code here based on `read_clean.R`
-}
+#}
 ```
