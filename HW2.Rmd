@@ -46,6 +46,45 @@ report_full <- report %>%
 # Preview the results
 head(report_full)
 head(events_full)
+
+
+```
+
+```{r}
+# creates a binary column (1(before Ibis coverage) or 0) for events that happens before Ibis coverage 
+events_full <- events_full %>% 
+  mutate(pre_ibis = ifelse(event_start_date >= coverage_start_date & event_start_date < ibis_coverage_start_date, 1,0),
+#creates a binary column (1(during Ibis coverage) or 0) for events that happened during Ibis coverage  
+    during_ibis = ifelse(
+      event_start_date >= ibis_coverage_start_date & event_start_date <= ibis_coverage_end_date,  
+      1,0))
+
+# this previews the new dataset, now show event start dates and the new binary columns  
+head(events_full %>% select(event_start_date, pre_ibis, during_ibis))
+```
+
+```{r}
+# View column names to check for existing 0/1 indicators
+head(colnames(events_full))
+
+# Compare pre_ibis with pre_ibis_inpatient
+table(events_full$pre_ibis, events_full$pre_ibis_inpatient, useNA = "ifany")
+
+# Compare during_ibis with ibis_inpatient (or another relevant column)
+table(events_full$during_ibis, events_full$ibis_inpatient, useNA = "ifany")
+```
+
+```{r}
+mismatches <- events_full %>%
+  filter(
+    pre_ibis != pre_ibis_inpatient |  # Check mismatches in pre_ibis
+    during_ibis != ibis_inpatient    # Check mismatches in during_ibis
+  )
+
+# View mismatched rows
+head(mismatches)
+
+table(mismatches$event_type, mismatches$pre_ibis, mismatches$pre_ibis_inpatient)
 ```
 
 ```{bash}
