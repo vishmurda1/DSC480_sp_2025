@@ -24,6 +24,7 @@ knitr::opts_chunk$set(
   require("knitr")
 )
 
+source("read_clean.R")
 ```
 
 ```{r, echo=FALSE, warning=FALSE, include=FALSE}
@@ -309,4 +310,10 @@ patients %>%
   geom_col(position = "dodge") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+```
+
+```{r}
+events_full %>% mutate(days_since_start = event_start_date - coverage_start_date)%>%
+  mutate(days_since_ibis = event_start_date - ibis_coverage_start_date)%>%
+    select(coverage_start_date, event_start_date, days_since_start, ibis_coverage_start_date, days_since_ibis)
 ```

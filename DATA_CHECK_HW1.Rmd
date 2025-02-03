@@ -55,23 +55,31 @@ report_full <- report %>%
   mutate(across(event_type, ~as.factor(.x))) #Converting event_type to Factor
 
 sum(is.na(events_full$event_start_date)) # check if any rows have NA values due to invalid timestamp formats
+
+
 ```
 
 print out the summary of the cleaned data
 
 ```{r}
 summary(events_full)
+library(skimr)
+skim(events)
 ```
 
 now for the other file
 
 ```{r}
-summary(report_full)
+#summary(report_full)
+skim(report_full)
+str(report_full)
 ```
 
 ```{r}
 summary(events_full$event_start_date) 
 summary(report_full$event_start_date)
+
+#patients <- report_full%>%
 ```
 
 some visualizations
