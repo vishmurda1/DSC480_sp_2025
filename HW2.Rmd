@@ -1,0 +1,53 @@
+---
+title: "HW2"
+author: "Vishal"
+date: "2025-02-03"
+output: pdf_document
+---
+
+```{r}
+getwd
+
+#source("read_clean.R")
+
+ls()
+head(events_full)   # Preview the events data
+head(report_full)   # Preview the report data
+```
+
+**Replace Dates with Days Since Coverage Start**
+
+```{r}
+colnames(report_full)
+
+colnames(events_full)
+
+
+
+# this converts timestamps to the number of days since coverage_start_date
+# Convert timestamps to POSIXct format
+events_full <- events %>% # Converting Timestamps to Date Format
+  mutate(across(contains("timestamp"),
+   ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")))  %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>% # Renaming Columns
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+  mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |> # Cleaning event_type Strings
+  mutate(across(event_type, ~as.factor(.x))) #Converting event_type to Factor
+
+
+report_full <- report %>%
+  mutate(across(contains("timestamp"),
+   ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")))  %>% # Converting Timestamps to Date Format
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>% #Renaming Columns
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+    mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |> #Cleaning event_type Strings
+  mutate(across(event_type, ~as.factor(.x))) #Converting event_type to Factor
+
+# Preview the results
+head(report_full)
+head(events_full)
+```
+
+```{bash}
+pwd
+```
