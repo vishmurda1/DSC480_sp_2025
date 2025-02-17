@@ -85,6 +85,13 @@ mismatches <- events_full %>%
 head(mismatches)
 
 table(mismatches$event_type, mismatches$pre_ibis, mismatches$pre_ibis_inpatient)
+
+
+```
+
+```{r}#1 label: MIIA terms}
+
+
 ```
 
 ```{bash}

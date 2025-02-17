@@ -1,0 +1,67 @@
+---
+title: "admissioncounts"
+author: "Vishal"
+date: "2025-02-10"
+output: pdf_document
+---
+
+```{r}
+source("read_clean.R")
+```
+
+```{r}
+# Summarize total admissions counts for Unicare-study vs All
+admissions_summary <- tibble(
+  Group = c("Unicare - Study", "All Groups"),
+  Pre_Ibis_Admissions = c(
+    pre_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% summarize(sum(admit_count)) %>% pull(),
+    pre_ibis_admissions_count %>% summarize(sum(admit_count, na.rm = TRUE)) %>% pull()
+  ),
+  Post_Ibis_Admissions = c(
+    post_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% summarize(sum(admit_count)) %>% pull(),
+    post_ibis_admissions_count %>% summarize(sum(admit_count, na.rm = TRUE)) %>% pull()
+  )
+)
+
+print(admissions_summary)
+```
+
+```{r}
+coverage_summary <- tibble(
+  Group = c("Unicare - Study", "All Groups"),
+  Pre_Ibis_Coverage_Days = c(
+    report_full %>% filter(org_name == "Unicare - Study") %>% summarize(sum(covered_days_pre_ibis, na.rm = TRUE)) %>% pull(),
+    report_full %>% summarize(sum(covered_days_pre_ibis, na.rm = TRUE)) %>% pull()
+  ),
+  Ibis_Coverage_Days = c(
+    report_full %>% filter(org_name == "Unicare - Study") %>% summarize(sum(covered_days_on_ibis, na.rm = TRUE)) %>% pull(),
+    report_full %>% summarize(sum(covered_days_on_ibis, na.rm = TRUE)) %>% pull()
+  )
+)
+
+print(coverage_summary)
+```
+
+```{r}
+admissions_ibis_vs_miia <- tibble(
+  Group = c("Unicare During Ibis", "MIIA Not on Ibis"),
+  Ibis_Admissions = c(
+    post_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% summarize(sum(admit_count)) %>% pull(),
+    post_ibis_admissions_count %>% filter(org_name == "MIIA") %>% summarize(sum(admit_count)) %>% pull()
+  )
+)
+
+print(admissions_ibis_vs_miia)
+```
+
+```{r}
+coverage_ibis_vs_miia <- tibble(
+  Group = c("Unicare During Ibis", "MIIA Not on Ibis"),
+  Ibis_Coverage_Days = c(
+    report_full %>% filter(org_name == "Unicare - Study") %>% summarize(sum(covered_days_on_ibis, na.rm = TRUE)) %>% pull(),
+    report_full %>% filter(org_name == "MIIA") %>% summarize(sum(covered_days_off_ibis, na.rm = TRUE)) %>% pull()
+  )
+)
+
+print(coverage_ibis_vs_miia)
+```
