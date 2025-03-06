@@ -154,3 +154,20 @@ mcnemar_result
 logit_model <- glm(ibis_inpatient ~ pre_ibis_inpatient, data = events_full_new, family = "binomial")
 summary(logit_model)
 ```
+
+```{r}
+inpatient_table <- pre_ibis_inpatient_table %>% 
+  full_join()
+```
+
+```{r}
+ibis_yes_no <- inpatient_table %>% 
+  pivot_longer(c(3,4), names_to = "pre_post", values_to = "admit_count")
+%>% 
+  mutate(admit = if_else(admit_count == 0,0,1))
+```
+
+```{r}
+glm(admit ~ pre_post, ibis_yes_no, family = "binomial") %>% summary()
+
+```
