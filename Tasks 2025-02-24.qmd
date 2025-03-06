@@ -1,0 +1,156 @@
+---
+title: "Tasks 2025-02-24"
+format: pdf
+---
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+
+# Read in the new events and report files
+events_new <- read_csv("2025_02_18_utilization_events.csv")
+report_new <- read_csv("2025_02_18_utilization_report.csv")
+
+# Preview the data
+#head(events_new)
+#head(report_new)
+
+## A bit of cleaning
+events_full_new <- events_new %>%
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+  mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |>
+  mutate(across(event_type, ~as.factor(.x)))
+
+
+report_full_new <- report_new %>%
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+    mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |>
+  mutate(across(event_type, ~as.factor(.x)))
+
+## add comment
+
+head(events_full_new)
+head(report_full_new)
+```
+
+**Count Total Inpatient Admissions**
+
+```{r}
+# Count total inpatient admissions for Unicare-Study
+pre_ibis_admissions <- events_full_new %>%
+  filter(org_name == "Unicare - Study", pre_ibis_inpatient == 1, event_type == "inpatient") %>%
+  summarise(total_pre_ibis_admissions = n())
+
+during_ibis_admissions <- events_full_new %>%
+  filter(org_name == "Unicare - Study", ibis_inpatient == 1, event_type == "inpatient") %>%
+  summarise(total_during_ibis_admissions = n())
+
+# Display results
+pre_ibis_admissions
+during_ibis_admissions
+```
+
+**Admissions Per 1000 Patient-Years**
+
+```{r}
+# Compute total patient days
+patient_days <- report_full_new %>%
+  summarise(
+    total_days_pre_ibis = sum(covered_days_pre_ibis, na.rm = TRUE),
+    total_days_on_ibis = sum(covered_days_on_ibis, na.rm = TRUE)
+  )
+
+# Convert days to years
+patient_years <- patient_days %>%
+  mutate(
+    pre_ibis_years = total_days_pre_ibis / 365,
+    on_ibis_years = total_days_on_ibis / 365
+  )
+
+# Compute admissions per 1000 patient-years
+admissions_per_1000 <- tibble(
+  period = c("Pre-Ibis", "During-Ibis"),
+  admissions = c(pre_ibis_admissions$total_pre_ibis_admissions,
+                 during_ibis_admissions$total_during_ibis_admissions),
+  patient_years = c(patient_years$pre_ibis_years, patient_years$on_ibis_years)
+) %>%
+  mutate(admissions_per_1000_years = (admissions / patient_years) * 1000)
+
+# Display results
+admissions_per_1000
+```
+
+**Count Admissions Per Patient**
+
+```{r}
+# Count number of admissions per patient for pre-Ibis
+pre_ibis_counts <- events_full_new %>%
+  filter(pre_ibis_inpatient == 1, event_type == "inpatient") %>%
+  group_by(pid) %>%
+  summarise(admit_count = n()) %>%
+  count(admit_count)
+
+# Count number of admissions per patient for during-Ibis
+during_ibis_counts <- events_full_new %>%
+  filter(ibis_inpatient == 1, event_type == "inpatient") %>%
+  group_by(pid) %>%
+  summarise(admit_count = n()) %>%
+  count(admit_count)
+
+# Display results
+pre_ibis_counts
+during_ibis_counts
+```
+
+**Compute Inpatient Days Per 1000 Days**
+
+```{r}
+# Compute inpatient days per 1000 patient-days
+inpatient_days_per_1000 <- tibble(
+  period = c("Pre-Ibis", "During-Ibis"),
+  inpatient_days = c(sum(events_full_new$pre_ibis_inpatient_days, na.rm = TRUE),
+                     sum(events_full_new$ibis_inpatient_days, na.rm = TRUE)),
+  total_days = c(patient_days$total_days_pre_ibis, patient_days$total_days_on_ibis)
+) %>%
+  mutate(inpatient_days_per_1000 = (inpatient_days / total_days) * 1000)
+
+# Display results
+inpatient_days_per_1000
+```
+
+**Statistical Tests**
+
+```{r}
+# Paired t-test: Compare admissions per day before and after.
+t_test_result <- t.test(pre_ibis_counts$admit_count, during_ibis_counts$admit_count, paired = TRUE)
+t_test_result
+```
+
+```{r}
+# Wilcoxon signed-rank test: Compare admission counts.
+wilcox_result <- wilcox.test(pre_ibis_counts$admit_count, during_ibis_counts$admit_count, paired = TRUE)
+wilcox_result
+```
+
+```{r}
+#McNemar’s Test: Check probability of admission pre vs. post.
+pre_post_matrix <- matrix(c(
+  sum(pre_ibis_counts$admit_count == 0 & during_ibis_counts$admit_count > 0),
+  sum(pre_ibis_counts$admit_count > 0 & during_ibis_counts$admit_count == 0),
+  sum(pre_ibis_counts$admit_count > 0 & during_ibis_counts$admit_count > 0),
+  sum(pre_ibis_counts$admit_count == 0 & during_ibis_counts$admit_count == 0)
+), nrow = 2, byrow = TRUE)
+
+mcnemar_result <- mcnemar.test(pre_post_matrix)
+mcnemar_result
+```
+
+```{r}
+# Logistic Regression: Predict probability of admission.
+logit_model <- glm(ibis_inpatient ~ pre_ibis_inpatient, data = events_full_new, family = "binomial")
+summary(logit_model)
+```
