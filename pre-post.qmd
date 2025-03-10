@@ -49,12 +49,11 @@ term <- 180
 -   \## stratify above by HCC score quantiles.
 
 ```{r prelim_wrangle, echo = FALSE}
-setwd("~/Dropbox/Projects/Senscio/DSC480_sp_2025")
 
 #df <- read_csv("data/2024-06-17T15-18_full_dataset.csv")
 #df <- read_csv("data/2024-08-28_utilization_report.csv")
 #df <- read_csv("data/9_9utilization_events.csv")
-df <- read_csv("../data/2024-11-18_utilization_events.csv")
+df <- read_csv("2025_02_18_utilization_events.csv")
 
 #data_full <- df %>% mutate_at(vars(contains("date")), ~as_date(.x))
 data_full <- df %>%
