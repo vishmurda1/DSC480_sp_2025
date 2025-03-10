@@ -125,6 +125,16 @@ inpatient_days_per_1000
 **Statistical Tests**
 
 ```{r}
+nrow(pre_ibis_counts)
+nrow(during_ibis_counts)
+```
+
+```{r}
+setdiff(pre_ibis_counts$pid, during_ibis_counts$pid)  # Patients missing from during_ibis_counts
+setdiff(during_ibis_counts$pid, pre_ibis_counts$pid)  # Patients missing from pre_ibis_counts
+```
+
+```{r}
 # Paired t-test: Compare admissions per day before and after.
 t_test_result <- t.test(pre_ibis_counts$admit_count, during_ibis_counts$admit_count, paired = TRUE)
 t_test_result
@@ -148,6 +158,8 @@ pre_post_matrix <- matrix(c(
 mcnemar_result <- mcnemar.test(pre_post_matrix)
 mcnemar_result
 ```
+
+The McNemar test results show a statistically significant difference (p = 0.000512) in admissions before and during Ibis, meaning the intervention had a measurable impact. Since the chi-square value (12.071) is relatively high, it suggests a strong deviation from what would be expected under no change. This indicates that patient admissions significantly changed between the two periods, likely due to the Ibis intervention.
 
 ```{r}
 # Logistic Regression: Predict probability of admission.
