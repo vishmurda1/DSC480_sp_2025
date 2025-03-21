@@ -181,5 +181,8 @@ ibis_yes_no <- inpatient_table %>%
 
 ```{r}
 glm(admit ~ pre_post, ibis_yes_no, family = "binomial") %>% summary()
+ 
 
 ```
+
+Test
