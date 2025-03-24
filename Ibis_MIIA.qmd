@@ -167,3 +167,11 @@ Use both numerical and graphical summaries
 -   HCC scores, by cohort
 -   Proportion with at least one admission, by cohort
 -   number of admissions, by cohort proportions
+
+```{r}
+glimpse(report_full)
+
+report_full %>% 
+  filter(str_detect(org_name, "Unicare")) %>% 
+  select(org_name, c('alzheimers':'lung_cancer'))
+```
