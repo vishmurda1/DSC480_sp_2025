@@ -4,6 +4,7 @@ format: pdf
 ---
 
 ```{r}
+
 library(survival)
 library(tidyverse)
 library(tidymodels)
