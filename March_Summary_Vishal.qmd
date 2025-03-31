@@ -1,0 +1,272 @@
+---
+title: "March_Summary_Vishal"
+format: pdf
+---
+
+The focus this month and this ongoing semester was on completing data exploration, cleaning, and analysis tasks using event and report data, working with IBIS coverage indicators, and applying statistical tests to summarize patient utilization.
+
+# Assignments Completed
+
+## 1. Data Check (DATA_CHECK_HW1.Rmd)
+
+-   Imported and cleaned `events_toy.csv` and `report_toy.csv` datasets.
+
+-   Converted timestamps to proper `Date` objects and renamed relevant columns.
+
+-   Created visualizations using `ggplot2`, including bar plots for inpatient admissions.
+
+-   Computed pre- and post-Ibis admission counts for Unicare-Study and all groups.
+
+-   Calculated total inpatient days and coverage days using derived date intervals.
+
+```{r}
+events_full <- events %>%
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+  mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |>
+  mutate(across(event_type, ~as.factor(.x)))
+
+
+report_full <- report %>%
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+    mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |>
+  mutate(across(event_type, ~as.factor(.x)))
+```
+
+## 2. Event Data Validation (2025-1-15_data_check.qmd)
+
+-   Validated the `pre_ibis` and `during_ibis` indicators by computing logical equivalents.
+
+-   Compared computed flags to existing binary indicators to verify data consistency.
+
+-   Reshaped admission data to long format for plotting using `pivot_longer()`.
+
+-   Created side-by-side bar plots for comparing admission counts.
+
+```{r}
+#| echo: false
+source("read_clean.R")
+
+
+#######
+####### 
+
+patients %>% filter(str_detect(org_name, "Unicare - Study"))  %>% nrow()
+  #  filter(org_name == "Unicare - Study") %>% nrow()
+
+
+report_full %>% filter(!is.na(first_reminder_complete_date))
+
+## pre ibis admissions count
+pre_ibis_admissions_count <- events_full %>% filter(event_start_date  <= ibis_coverage_start_date) %>% filter(event_start_date >= coverage_start_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(admit_count = n()) %>% 
+    right_join(patients, by = "pid") %>% mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))
+
+
+## post ibis admissions count
+post_ibis_admissions_count <- events_full %>% filter(event_start_date > ibis_coverage_start_date) %>% filter(event_start_date <= ibis_coverage_end_date) %>%
+    select(pid, event_type, event_start_date) %>%
+    filter(event_type == "inpatient") %>%
+    group_by(pid) %>% summarize(admit_count = n()) %>% 
+    right_join(patients, by = "pid") %>% mutate(admit_count = ifelse(is.na(admit_count), 0, admit_count))
+
+post_ibis_admissions_count
+
+pre_ibis_admissions_count
+
+pre_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>% 
+    summarize(unicare_pre_admits  = sum(admit_count))
+
+post_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>%
+    summarize(unicare_post_admits = sum(admit_count))
+
+```
+
+## 3. Condition Analysis (Ibis_MIIA.qmd)
+
+-   Grouped patient conditions by Unicare vs non-Unicare.
+
+-   Created stacked bar plots to compare proportions of conditions across groups.
+
+-   Used `pivot_longer()` and `fct_reorder()` for effective data reshaping and plotting.
+
+## 4. Utilization Analysis (Tasks 2025-02-24_vishal.qmd)
+
+-   Worked with updated datasets: `2025_02_18_utilization_events.csv` and `2025_02_18_utilization_report.csv`.
+
+-   Filtered inpatient admissions by pre- and during-Ibis periods using indicators.
+
+-   Computed total admissions and inpatient days per 1000 patient years.
+
+-   Verified coverage day totals with both calculated and reported values.
+
+-   Conducted statistical tests:
+
+    -   Paired t-test and Wilcoxon signed-rank test for admission count comparisons.
+
+    -   McNemar’s test and logistic regression for binary admission probability changes.
+
+**Count Total Inpatient Admissions**
+
+```{r}
+#| echo: false
+# Count total inpatient admissions for Unicare-Study
+pre_ibis_admissions <- events_full_new %>%
+  filter(org_name == "Unicare - Study", pre_ibis_inpatient == 1, event_type == "inpatient") %>%
+  summarise(total_pre_ibis_admissions = n())
+
+during_ibis_admissions <- events_full_new %>%
+  filter(org_name == "Unicare - Study", ibis_inpatient == 1, event_type == "inpatient") %>%
+  summarise(total_during_ibis_admissions = n())
+
+# Display results
+pre_ibis_admissions
+during_ibis_admissions
+```
+
+**Admissions Per 1000 Patient-Years**
+
+```{r}
+#| echo: false
+# Compute total patient days
+patient_days <- report_full_new %>%
+  summarise(
+    total_days_pre_ibis = sum(covered_days_pre_ibis, na.rm = TRUE),
+    total_days_on_ibis = sum(covered_days_on_ibis, na.rm = TRUE)
+  )
+
+# Convert days to years
+patient_years <- patient_days %>%
+  mutate(
+    pre_ibis_years = total_days_pre_ibis / 365,
+    on_ibis_years = total_days_on_ibis / 365
+  )
+
+# Compute admissions per 1000 patient-years
+admissions_per_1000 <- tibble(
+  period = c("Pre-Ibis", "During-Ibis"),
+  admissions = c(pre_ibis_admissions$total_pre_ibis_admissions,
+                 during_ibis_admissions$total_during_ibis_admissions),
+  patient_years = c(patient_years$pre_ibis_years, patient_years$on_ibis_years)
+) %>%
+  mutate(admissions_per_1000_years = (admissions / patient_years) * 1000)
+admissions_per_1000
+```
+
+**Count Admissions Per Patient**
+
+```{r}
+#| echo: false
+# Count number of admissions per patient for pre-Ibis
+pre_ibis_counts <- events_full_new %>%
+  filter(pre_ibis_inpatient == 1, event_type == "inpatient") %>%
+  group_by(pid) %>%
+  summarise(admit_count = n()) %>%
+  count(admit_count)
+
+# Count number of admissions per patient for during-Ibis
+during_ibis_counts <- events_full_new %>%
+  filter(ibis_inpatient == 1, event_type == "inpatient") %>%
+  group_by(pid) %>%
+  summarise(admit_count = n()) %>%
+  count(admit_count)
+
+pre_ibis_counts
+during_ibis_counts
+```
+
+**Compute Inpatient Days Per 1000 Days**
+
+```{r}
+#| echo: false
+inpatient_days_per_1000 <- tibble(
+  period = c("Pre-Ibis", "During-Ibis"),
+  inpatient_days = c(sum(events_full_new$pre_ibis_inpatient_days, na.rm = TRUE),
+                     sum(events_full_new$ibis_inpatient_days, na.rm = TRUE)),
+  total_days = c(patient_days$total_days_pre_ibis, patient_days$total_days_on_ibis)
+) %>%
+  mutate(inpatient_days_per_1000 = (inpatient_days / total_days) * 1000)
+
+# Display results
+inpatient_days_per_1000
+```
+
+## Statistical Testing
+
+-   **Paired t-test**: Compared mean admissions before and during IBIS.
+
+```{r}
+#| echo: false
+
+colnames(pre_ibis_counts)
+colnames(during_ibis_counts)
+
+# Pre-IBIS admissions
+pre_ibis_counts <- events_full %>%
+  filter(pre_ibis_inpatient == 1, event_type == "inpatient") %>%
+  group_by(pid) %>%
+  summarise(admit_count = n(), .groups = "drop")
+
+# During-IBIS admissions
+during_ibis_counts <- events_full %>%
+  filter(ibis_inpatient == 1, event_type == "inpatient") %>%
+  group_by(pid) %>%
+  summarise(admit_count = n(), .groups = "drop")
+
+#
+paired_data <- inner_join(pre_ibis_counts, during_ibis_counts, by = "pid", suffix = c("_pre", "_during"))
+
+# Run paired t-test
+t_test_result <- t.test(paired_data$admit_count_pre, paired_data$admit_count_during, paired = TRUE)
+print(t_test_result)
+```
+
+A paired t-test comparing mean inpatient admissions before and during IBIS showed a mean increase of 0.375 admissions during IBIS. However, the result was marginally non-significant (p = 0.054), indicating limited evidence to support a meaningful change in average admission counts.
+
+-   **Wilcoxon signed-rank test**: Used as a non-parametric alternative to assess paired differences.
+
+```{r}
+# Run Wilcoxon signed-rank test
+wilcox_result <- wilcox.test(
+  paired_data$admit_count_pre,
+  paired_data$admit_count_during,
+  paired = TRUE
+)
+
+# 
+print(wilcox_result)
+```
+
+Wilcoxon signed-rank test was conducted to compare admission counts before and during IBIS. The results showed no significant difference (V = 10, p = 0.0947), indicating that the IBIS intervention did not lead to a statistically significant change in median admission counts.
+
+-   **McNemar's test**: Assessed changes in the probability of admission.
+
+```{r}
+#McNemar’s Test: Check probability of admission pre vs. post.
+pre_post_matrix <- matrix(c(
+  sum(pre_ibis_counts$admit_count == 0 & during_ibis_counts$admit_count > 0),
+  sum(pre_ibis_counts$admit_count > 0 & during_ibis_counts$admit_count == 0),
+  sum(pre_ibis_counts$admit_count > 0 & during_ibis_counts$admit_count > 0),
+  sum(pre_ibis_counts$admit_count == 0 & during_ibis_counts$admit_count == 0)
+), nrow = 2, byrow = TRUE)
+
+mcnemar_result <- mcnemar.test(pre_post_matrix)
+mcnemar_result  
+```
+
+The resulting test showed a **McNemar’s chi-squared = 237**, **df = 1**, with a **p-value \< 2.2e-16**, indicating a highly significant difference in admission probability before and during IBIS. This suggests that IBIS implementation was associated with a statistically significant change in the likelihood of inpatient admissions.
+
+-   **Logistic regression**: Modeled the likelihood of admission during IBIS, using pre-IBIS admission status as a predictor.
+
+```{r}
+# Logistic Regression: Predict probability of admission.
+logit_model <- glm(ibis_inpatient ~ pre_ibis_inpatient, data = events_full_new, family = "binomial")
+summary(logit_model)
+```
+
+logistic regression model was used to evaluate whether pre-IBIS inpatient status predicted the likelihood of inpatient admission during IBIS. The results showed no statistically significant effect (p = 0.959). The odds ratio was extremely low, indicating that pre-IBIS status did not meaningfully change the probability of admission during IBIS. This suggests the intervention (IBIS) may have had an equalizing effect, making prior admission history a non-factor.
