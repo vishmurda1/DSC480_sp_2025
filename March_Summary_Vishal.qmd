@@ -3,6 +3,27 @@ title: "March_Summary_Vishal"
 format: pdf
 ---
 
+```{r}
+library(survival)
+library(tidyverse)
+library(tidymodels)
+#library(ggsurvfit)
+library(lubridate)
+#library(ggfortify)
+library(lmtest)
+
+library(car)
+library(poissonreg)
+
+library(pscl)
+
+library(broom)
+library(broom.mixed)
+
+library(readr)
+library(skimr)
+```
+
 The focus this month and this ongoing semester was on completing data exploration, cleaning, and analysis tasks using event and report data, working with IBIS coverage indicators, and applying statistical tests to summarize patient utilization.
 
 # Assignments Completed
@@ -20,6 +41,11 @@ The focus this month and this ongoing semester was on completing data exploratio
 -   Calculated total inpatient days and coverage days using derived date intervals.
 
 ```{r}
+events <- read_csv("events_toy.csv")
+report <- read_csv("report_toy.csv")
+
+
+## A bit of cleaning
 events_full <- events %>%
   mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
   mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
@@ -53,6 +79,8 @@ source("read_clean.R")
 
 #######
 ####### 
+patients <- events %>% 
+  filter(str_detect(org_name, "Unicare - Study"))
 
 patients %>% filter(str_detect(org_name, "Unicare - Study"))  %>% nrow()
   #  filter(org_name == "Unicare - Study") %>% nrow()
@@ -115,6 +143,32 @@ post_ibis_admissions_count %>% filter(org_name == "Unicare - Study") %>%
 
 ```{r}
 #| echo: false
+
+# Read in the new events and report files
+events_new <- read_csv("2025_02_18_utilization_events.csv")
+report_new <- read_csv("2025_02_18_utilization_report.csv")
+
+
+# Preview the data
+#head(events_new)
+#head(report_new)
+
+## A bit of cleaning
+events_full_new <- events_new %>%
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+  mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |>
+  mutate(across(event_type, ~as.factor(.x)))
+
+
+report_full_new <- report_new %>%
+  mutate_at(vars(contains("timestamp")), ~as.POSIXct(.x, format = "%Y-%m-%d %H:%M:%S")) %>%
+  mutate_at(vars(contains("timestamp")), ~as_date(.x)) %>%
+  rename_with(~str_replace(., "timestamp", "date"), contains("timestamp")) %>%
+    mutate(across(event_type, ~ str_replace(.x, " ", "_"))) |>
+  mutate(across(event_type, ~as.factor(.x)))
+
 # Count total inpatient admissions for Unicare-Study
 pre_ibis_admissions <- events_full_new %>%
   filter(org_name == "Unicare - Study", pre_ibis_inpatient == 1, event_type == "inpatient") %>%
