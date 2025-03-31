@@ -270,3 +270,10 @@ summary(logit_model)
 ```
 
 logistic regression model was used to evaluate whether pre-IBIS inpatient status predicted the likelihood of inpatient admission during IBIS. The results showed no statistically significant effect (p = 0.959). The odds ratio was extremely low, indicating that pre-IBIS status did not meaningfully change the probability of admission during IBIS. This suggests the intervention (IBIS) may have had an equalizing effect, making prior admission history a non-factor.
+<<<<<<< HEAD
+=======
+
+**Final Thoughts**
+
+Overall, the analysis showed that IBIS didn’t lead to a clear or consistent change in admission patterns. While McNemar’s test showed a significant shift, other tests like the t-test, Wilcoxon, and logistic regression didn’t show strong evidence. This highlights the value of using multiple methods to fully understand program impact.
+>>>>>>> bfa7903 (Finish upload of summary, was giving issue pushing earlier. Should be good now)
